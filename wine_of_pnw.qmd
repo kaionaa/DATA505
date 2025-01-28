@@ -1,0 +1,132 @@
+**Abstract:**
+
+This is a technical blog post of **both** an HTML file *and* [.qmd file](src/wine_of_pnw.qmd) hosted on GitHub pages.
+
+# Setup
+
+**Step Up Code:**
+
+```{r, echo = FALSE}
+library(tidyverse)
+library(moderndive)
+
+wine <- readRDS(gzcon(url("https://github.com/cd-public/DSLM-505/raw/master/dat/wine.rds"))) %>%
+  filter(province=="Oregon" | province=="California" | province=="New York") %>% 
+  mutate(cherry=as.integer(str_detect(description,"[Cc]herry"))) %>% 
+  mutate(lprice=log(price)) %>% 
+  select(lprice, points, cherry, province)
+```
+
+**Explanation:**
+
+> [TODO]{style="color:red;font-weight:bold"}:
+>
+> -   the first line reads in the data set from GitHub and labels it "wine"
+>
+> -   the second line filters for observations in Oregon, California, or New York
+>
+> -   the third line changes the observations in the cherry variable to an integer based on the presence of cherry
+>
+> -   the last two lines create a log version of the price variable, then selects for specific categories of the data set
+
+# Multiple Regression
+
+## Linear Models
+
+First run a linear regression model with log of price as the dependent variable and 'points' and 'cherry' as features (variables).
+
+```{r}
+model <- lm(lprice ~ points+cherry, data = wine)
+print(model)
+get_regression_table(model)
+get_regression_summaries(model)
+```
+
+**Explanation:**
+
+> [TODO]{style="color:red;font-weight:bold"}: in one line I created the linear model called "model" then defined the terms of the model in the lm function and called the wine data
+>
+> in the next line I printed the results
+>
+> then in the last two lines I used functions from the moderndive package to synthesize results
+
+> [TODO]{style="color:red;font-weight:bold"}: The RMSE is 0.4687657
+
+## Interaction Models
+
+Add an interaction between 'points' and 'cherry'.
+
+```{r}
+imodel <- lm(lprice ~ points * cherry, data = wine)
+get_regression_table(imodel)
+get_regression_summaries(imodel)
+```
+
+> [**TODO**]{style="color:red;font-weight:bold"}: in one line I created the linear model called "imodel" then defined the terms of the model in the lm function and called the wine data, but made sure that points and cherry were interacting instead of adding together
+>
+> in the next line I printed the results
+>
+> then in the last two lines I used functions from the moderndive package to synthesize results
+
+> [**TODO**]{style="color:red;font-weight:bold"}: The RMSE is 0.4685223
+
+### The Interaction Variable
+
+> [TODO]{style="color:red;font-weight:bold"}: *interpret the coefficient on the interaction variable.* <br>[Explain as you would to a non-technical manager.](https://youtube.com/clip/UgkxY7ohjoimIef6zpPLjgQHqJcJHeZptuVm?feature=shared)
+
+## Applications
+
+Determine which province (Oregon, California, or New York), does the 'cherry' feature in the data affect price most?
+
+```{r}
+orwine <- wine%>%
+  filter(province == "Oregon")
+ormod <- lm(lprice ~ points * cherry, data = orwine)
+get_regression_summaries(ormod)
+
+cawine <- wine%>%
+  filter(province == "California")
+camod <- lm(lprice ~ points * cherry, data = cawine)
+get_regression_summaries(camod)
+
+
+nywine <- wine%>%
+  filter(province == "New York")
+nymod <- lm(lprice ~ points * cherry, data = nywine)
+get_regression_summaries(nymod)
+
+mods <- list(
+  lm(lprice ~ points * cherry, data = orwine),
+  lm(lprice ~ points * cherry, data = cawine),
+  lm(lprice ~ points * cherry, data = nywine)
+)
+```
+
+> [**TODO**]{style="color:red;font-weight:bold"}: For each region, I ended up creating a sub data set filtered for the specific region. Then I created a model for each new data set and ran models respectively.
+
+# Scenarios
+
+## On Accuracy
+
+Imagine a model to distinguish New York wines from those in California and Oregon. After a few days of work, you take some measurements and note: "I've achieved 91% accuracy on my model!"
+
+Should you be impressed? Why or why not?
+
+```{r}
+
+```
+
+> [**TODO**]{style="color:red;font-weight:bold"}: Since I created new data sets for each state in the code above, I am able to notice that there are less New York wines than Oregon or California wines, respectively.
+
+## On Ethics
+
+Why is understanding this vignette important to use machine learning in an ethical manner?
+
+> [**TODO**]{style="color:red;font-weight:bold"}: This scenario could lead to inaccurate assumptions about New York wines, which could be bad. However, predictive modeling used on sociological data sets could be used to generate inacurate assumptions about entire groups of people (regionally, racially, on the basis of gender, etc.) which would be way worse.
+
+## Ignorance is no excuse
+
+Imagine you are working on a model to predict the likelihood that an individual loses their job as the result of the changing federal policy under new presidential administrations. You have a very large dataset with many hundreds of features, but you are worried that including indicators like age, income or gender might pose some ethical problems. When you discuss these concerns with your boss, she tells you to simply drop those features from the model. Does this solve the ethical issue? Why or why not?
+
+> [**TODO**]{style="color:red;font-weight:bold"}: No, this solves nothing. The question isn't if the ethical considerations should or shouldn't be considered, it is **how** it should be considered in the model.
+
