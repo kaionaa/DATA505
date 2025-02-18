@@ -1,0 +1,140 @@
+---
+title: "Conditional Probability"
+author: "Kaiona Apio"
+date: "02/17/2025"
+
+format: 
+  html: 
+    theme: superhero  
+    mainfont: monospace
+    highlight-style: github
+    title-block-banner: true
+    embed-resources: true
+---
+
+# 1. Setup
+
+**Step Up Code:**
+
+```{r, warning=FALSE}
+sh <- suppressPackageStartupMessages
+sh(library(tidyverse))
+sh(library(caret))
+sh(library(tidytext))
+wine <- readRDS(gzcon(url("https://github.com/cd-public/D505/raw/master/dat/pinot.rds")))
+```
+
+# 2. Conditional Probability
+
+Calculate the probability that a Pinot comes from Burgundy given it has the word 'fruit' in the description.
+
+```{r, Feature Engineering}
+wino <- wine%>%
+  mutate(fruit = str_detect(description, "fruit"))
+```
+
+$$
+P(Burgundy | Fruit) = \frac{P(Burgundy \space\&\space Fruit)}{p(Fruit)}
+$$
+
+```{r}
+fruit <- nrow(filter(wino, fruit))/nrow(wino)
+burg_n_fruit <- nrow(filter(wino, province=="Burgundy" & fruit))/nrow(wino)
+print(burg_n_fruit/fruit)
+```
+
+# 3. Naive Bayes Algorithm
+
+We train a naive bayes algorithm to classify a wine's province using: 1. An 80-20 train-test split. 2. Three features engineered from the description 3. 5-fold cross validation.
+
+We report Kappa after using the model to predict provinces in the holdout sample.
+
+```{r, Feature Engineering 2}
+winos <- wino %>% 
+  mutate(yearf = as.factor(year)) %>% 
+  mutate(spicy = str_detect(description,"spicy")) %>% 
+  mutate(tart = str_detect(description,"tart")) %>%
+  mutate(pink = str_detect(description,"pink")) %>%
+  select(-description, year)
+
+glimpse(winos)
+```
+
+```{r, Train-test Split}
+set.seed(505)
+winos_index <- createDataPartition(winos$province, p = 0.80, list = FALSE)
+train <- wino[ winos_index, ]
+test <- wino[-winos_index, ]
+```
+
+```{r, Training w/5-fold Cross Validation}
+fit <- train(province ~ .,
+             data = train, 
+             method = "naive_bayes",
+             metric = "Kappa",
+             trControl = trainControl(number = 5, method = "cv"))
+fit
+```
+
+
+# 4. Frequency Differences
+
+We find the three words that most distinguish New York Pinots from all other Pinots.
+
+```{r}
+nydf <- wine %>%
+  mutate(province = ifelse(province == "New_York", "NY", "Not_NY"))
+
+df <- nydf %>%
+  unnest_tokens(word, description) %>% 
+  anti_join(stop_words) %>% 
+  filter(str_detect(string = word, pattern = "[a-z+]")) %>%  
+  filter(str_length(word)>3) %>%
+  group_by(word) %>% 
+  mutate(total=n()) %>% 
+  ungroup()
+head(df)
+
+newdf <- df%>% 
+    filter(!(word %in% c("wine","pinot","drink","noir","vineyard","palate","notes","flavors","bottling"))) %>% 
+    filter(total > 400) %>% 
+    group_by(province, word) %>%
+    count() %>% 
+    group_by(province) %>%
+    mutate(proportion = n / sum(n)) %>% 
+    pivot_wider(id_cols = word, names_from = province, values_from = proportion)
+head(newdf)
+
+newdf%>%
+    ggplot(aes(x = NY, y = Not_NY, color = abs(NY - Not_NY))) +
+      geom_abline(color = "gray40", lty = 2) +
+      geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+      geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+      scale_x_log10(labels = percent_format()) +
+      scale_y_log10(labels = percent_format()) +
+      scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "gray75") +
+      theme(legend.position="none") +
+      labs(x = "NY", y = "Not NY", title = "Words describing Pinot Noir from NY and Not NY")
+```
+
+```{r}
+dtxt <- df %>% 
+  filter(!(word %in% c("wine","pinot","drink","noir","vineyard","palate","notes","flavors","bottling","bottle","finish"))) %>% 
+  filter(total > 400) %>% 
+  group_by(province, word) %>%
+  count() %>% 
+  group_by(province) %>% 
+  mutate(proportion = n / sum(n)) %>% 
+  pivot_wider(id_cols = word, names_from = province, values_from = proportion) %>% 
+  mutate(diff=NY-Not_NY) 
+
+dtxt %>%
+  top_n(25, diff) %>%
+  mutate(word = reorder(word, diff)) %>%
+  ggplot(aes(word, diff)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip()
+```
+
+**Answer:** The three most popular words in New York pinots are "cherry", "tannins","concentrated" located on the top of the bar graph. 
