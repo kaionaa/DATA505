@@ -14,7 +14,7 @@ format:
 
 **Abstract:**
 
-This is a technical blog post of **both** an HTML file *and* [.qmd file](https://https://github.com/kaionaa/DATA505/blob/main/Classification.qmd) hosted on GitHub pages.
+This is a technical blog post of **both** an HTML file *and* [.qmd file](https://github.com/kaionaa/DATA505/blob/main/Classification.qmd) hosted on GitHub pages.
 
 # 1. Setup
 
